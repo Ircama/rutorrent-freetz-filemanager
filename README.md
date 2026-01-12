@@ -1,3 +1,15 @@
+# rutorrent-freetz-filemanager
+
+This is an enhancement of [rutorrent-filemanager](https://github.com/nelu/rutorrent-filemanager) for the rtorrent/rutorrent package of [Freetz-NG](https://github.com/Freetz-NG/freetz-ng).
+
+Features:
+ - BusyBox compatibility (uses stat instead of find -printf)
+ - p7zip RAR archive support with table format parser
+ - Enhanced UI with time field, ls-style permissions, user/group columns
+ - Directory size display
+ - Archive browsing with raw output display
+
+
 # rutorrent-filemanager
 [![Docker Multiarch Build](https://github.com/nelu/rutorrent-filemanager/actions/workflows/docker-image.yml/badge.svg)](https://hub.docker.com/r/unzel/rutorrent-filemanager/tags)
 
