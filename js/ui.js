@@ -216,9 +216,17 @@ export function FileManagerUi(flm) {
                 name: "datafrm", id: "datafrm"
             }).width(0).height(0)
             .on('load', function () {
-                var d = (this.contentDocument || this.contentWindow.document);
-                if (d.location.href !== "about:blank") try {
-                    eval(d.body.innerHTML);
+                let d;
+                try {
+                    d = (this.contentDocument || this.contentWindow.document);
+                } catch (e) {
+                    // Cross-origin navigation (e.g. download redirect) - ignore.
+                    return;
+                }
+                try {
+                    if (d && d.location && d.location.href !== "about:blank") {
+                        eval(d.body.innerHTML);
+                    }
                 } catch (e) {
                 }
             }));
@@ -408,6 +416,11 @@ export function FileManagerUi(flm) {
     this.viewNFO = function (file) {
         file && self.filenav.setSelectedTarget(file);
         self.dialogs.showDialog('nfo_view');
+    };
+
+    this.viewImage = function (file) {
+        file && self.filenav.setSelectedTarget(file);
+        self.dialogs.showDialog('image_view');
     };
 
     this.showPermissions = function () {

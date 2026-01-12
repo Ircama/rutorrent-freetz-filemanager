@@ -14,6 +14,32 @@ class Archive
     protected $config = [];
     protected $workDir;
 
+    private function resolve7zipBinary(): string
+    {
+        $ext = strtolower((string)pathinfo($this->file, PATHINFO_EXTENSION));
+        $binKey = $this->config['type'][$ext]['bin'] ?? ($this->config['bin'] ?? '7z');
+
+        $bin = Utility::getExternal($binKey);
+        if (!empty($bin)) {
+            return $bin;
+        }
+
+        // Common ruTorrent external name fallback.
+        if ($binKey !== '7zip') {
+            $binAlt = Utility::getExternal('7zip');
+            if (!empty($binAlt)) {
+                return $binAlt;
+            }
+        }
+
+        // Fallbacks for environments without ruTorrent externals mapping.
+        if (!empty($binKey)) {
+            return $binKey;
+        }
+
+        return '7z';
+    }
+
 
     public function __construct($archive_file, $config = [])
     {
@@ -129,9 +155,13 @@ class Archive
             $type = pathinfo($this->file, PATHINFO_EXTENSION);
         }
 
-        $formatBin = isset($this->config['type'][$type]['bin']) ? $this->config['type'][$type]['bin'] : '7zip';
+        $formatBinKey = isset($this->config['type'][$type]['bin']) ? $this->config['type'][$type]['bin'] : ($this->config['bin'] ?? '7z');
 
-        $formatBin = Utility::getExternal($formatBin);
+        $formatBin = Utility::getExternal($formatBinKey);
+        if (empty($formatBin)) {
+            // Allow using the binary name directly if externals mapping is missing.
+            $formatBin = $formatBinKey;
+        }
 
         return (
             isset($this->config['type'][$type]['wrapper'])
@@ -163,10 +193,12 @@ class Archive
             $this->setWorkDir($path);
         }
 
+        $bin = $this->resolve7zipBinary();
+
         $p = (object)array_merge($this->options, [
             'file' => $this->file,
             'to' => './',
-            'binary' => Utility::getExternal('7zip'),
+            'binary' => $bin,
         ]);
 
         $cmds = [ShellCmds::mkdir($this->workDir, true)->cmd(),
@@ -195,9 +227,13 @@ class Archive
     public function list($path = null): ShellCmd
     {
         $path && $this->setWorkDir($path);
-        return P7zip::list($this->file, $this->config['list_limit'] ?? 1000)
-            ->binary(Utility::getExternal('7zip'))
-            ->setPassword(isset($this->options->password) && strlen($this->options->password) > 0 ? $this->options->password : '')
+
+        $bin = $this->resolve7zipBinary();
+
+        $password = $this->options['password'] ?? '';
+        return P7zip::listSlt($this->file)
+            ->binary($bin)
+            ->setPassword((is_string($password) && strlen($password) > 0) ? $password : '')
             ->setProgressIndicator(1);
     }
 }

@@ -94,6 +94,16 @@ plugin.ui.setConfig = function () {
                 type: TYPE_STRING,
                 "align": ALIGN_CENTER
             }, {
+                text: ($type(theUILang.fUser) ? theUILang.fUser : 'User'),
+                width: "90px",
+                id: "user",
+                type: TYPE_STRING
+            }, {
+                text: ($type(theUILang.fGroup) ? theUILang.fGroup : 'Group'),
+                width: "90px",
+                id: "group",
+                type: TYPE_STRING
+            }, {
                 text: '',
                 width: "80px",
                 id: "type",
@@ -102,7 +112,7 @@ plugin.ui.setConfig = function () {
                 text: '',
                 width: "80px",
                 id: "perm",
-                type: TYPE_NUMBER
+                type: TYPE_STRING
             }],
         container: plugin.ui.fsBrowserTableContainer
     };

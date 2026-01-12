@@ -268,20 +268,33 @@ export function FsBrowser(fm) {
         var pathIsDir = utils.isDir(target);
         var menu = [];
 
-        menu.push([
-            theUILang.fOpen,
-            (entries.length > 1) ? null : function () {
-                self.open(target);
-            }]);
+        // Check if it's a media, image, or download-only (binary) file
+        var ext = utils.getExt(target).toLowerCase();
+        var lowerTarget = (target || '').toLowerCase();
+        var mediaExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'mpg', 'mpeg', 'ts', 'mts', 'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'ac3'];
+        var imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+        var isMedia = mediaExts.indexOf(ext) !== -1;
+        var isImage = imageExts.indexOf(ext) !== -1;
+        var isArchive = (flm.archive && typeof flm.archive.isArchive === 'function') ? flm.archive.isArchive(target) : false;
+        var isDownloadOnly = lowerTarget.endsWith('.m4a.ac3');
+
+        if (!isMedia && !isImage && !isArchive && !isDownloadOnly) {
+            menu.push([
+                theUILang.fView,
+                (entries.length > 1) ? null : function () {
+                    flm.ui.viewNFO(target);
+                }]);
+        }
 
         if (!self.isTopDir(target)) {
 
             var fext = utils.getExt(target);
 
+            menu.push([ "Download", (entries.length > 1) ? null : function () {
+                flm.getFile(target);
+            }]);
+
             if (flm.utils.isTextfile(fext)) {
-                menu.push([theUILang.fView, () => {
-                    flm.ui.viewNFO(target);
-                }]);
                 menu.push([CMENU_SEP]);
             }
 
@@ -338,7 +351,28 @@ export function FsBrowser(fm) {
         if (flm.utils.isDir(path)) {
             flm.goToPath(path);
         } else {
-            flm.getFile(path);
+            // Archives: open archive browser instead of downloading.
+            if (flm.archive && typeof flm.archive.isArchive === 'function' && flm.archive.isArchive(path)) {
+                self.selectedEntries = [path];
+                self.selectedTarget = path;
+                flm.archive.showBrowse();
+                return false;
+            }
+
+            // Check if it's a media file - download instead of view
+            var ext = flm.utils.getExt(path).toLowerCase();
+            var lowerPath = (path || '').toLowerCase();
+            var mediaExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'mpg', 'mpeg', 'ts', 'mts', 'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'ac3'];
+            var imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+            var isDownloadOnly = lowerPath.endsWith('.m4a.ac3');
+
+            if (mediaExts.indexOf(ext) !== -1 || isDownloadOnly) {
+                flm.getFile(path);
+            } else if (imageExts.indexOf(ext) !== -1) {
+                flm.ui.viewImage(path);
+            } else {
+                flm.ui.viewNFO(path);
+            }
         }
 
         return false;
@@ -387,6 +421,8 @@ export function FsBrowser(fm) {
                     name: path,
                     size: '',
                     time: '',
+                    user: '',
+                    group: '',
                     type: '/',
                     perm: ''
                 },
@@ -413,6 +449,8 @@ export function FsBrowser(fm) {
                 name: file.name,
                 size: file.size,
                 time: file.time,
+                user: file.user || '',
+                group: file.group || '',
                 type: ftype + file.name,
                 perm: file.perm
             };
@@ -465,7 +503,10 @@ export function FsBrowser(fm) {
                         break;
                     case 'perm':
                         if (flm.ui.settings.getSettingValue('permf') > 1) {
-                            arr[i] = flm.utils.formatPermissions(arr[i]);
+                            // Only translate octal strings; keep ls-style strings as-is
+                            if (/^[0-7]{3,4}$/.test(arr[i])) {
+                                arr[i] = flm.utils.formatPermissions(arr[i]);
+                            }
                         }
                         break;
                 }
@@ -479,8 +520,30 @@ export function FsBrowser(fm) {
 
 
         table.renameColumnById('time', theUILang.fTime);
+        table.renameColumnById('user', ($type(theUILang.fUser) ? theUILang.fUser : 'User'));
+        table.renameColumnById('group', ($type(theUILang.fGroup) ? theUILang.fGroup : 'Group'));
         table.renameColumnById('type', theUILang.fType);
         table.renameColumnById('perm', theUILang.fPerm);
+    };
+
+    this.setDirSize = function (bytes) {
+        let el = $('#flm-dirsize');
+        if (!el.length) {
+            return;
+        }
+
+        if (bytes == null) {
+            el.text('');
+            return;
+        }
+
+        const n = Number(bytes);
+        if (!Number.isFinite(n)) {
+            el.text('');
+            return;
+        }
+
+        el.text(theConverter.bytes(n < 0 ? 0 : n, 2));
     };
 
     return self;

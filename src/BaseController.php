@@ -25,17 +25,48 @@ abstract class BaseController
         global $topDirectory;
 
         $this->config = $config;
+        
+        // Use config root if set, else topDirectory, else /tmp
+        $rootDir = $this->config['root'] ?? $topDirectory ?? '/tmp';
+        error_log("filemanager BaseController: using rootDir = $rootDir");
+        
         $this->flm = new FileManager(
-            new Filesystem($topDirectory),
+            new Filesystem($rootDir),
             $this->config,
             null
         );
+        // Set initial workdir to rootDir
+        $this->flm->workDir($rootDir);
     }
 
     public function handleRequest()
     {
 
-        if (isset($_POST['action'])) {
+        error_log("filemanager debug: _POST: " . json_encode($_POST));
+        error_log("filemanager debug: _GET: " . json_encode($_GET));
+        error_log("filemanager debug: _SERVER: " . json_encode([
+            'REQUEST_METHOD' => $_SERVER['REQUEST_METHOD'] ?? '',
+            'SCRIPT_NAME' => $_SERVER['SCRIPT_NAME'] ?? '',
+            'REQUEST_URI' => $_SERVER['REQUEST_URI'] ?? ''
+        ]));
+        global $topDirectory;
+        error_log("filemanager debug: topDirectory: " . (isset($topDirectory) ? $topDirectory : 'not set'));
+        error_log("filemanager debug: config: " . json_encode($this->config));
+
+        // Special-case: allow GET only for a strict allowlist of binary responses
+        // (needed for <img src="..."> which cannot POST)
+        if (!isset($_POST['action']) && !isset($_POST['cmd']) && isset($_GET['method'])) {
+            $allowedGetMethods = ['viewImage'];
+            $method = $_GET['method'];
+            if (in_array($method, $allowedGetMethods, true)) {
+                $call = ['method' => $method];
+                if (isset($_GET['target'])) {
+                    $call['target'] = $_GET['target'];
+                }
+            } else {
+                self::jsonError('Invalid action');
+            }
+        } elseif (isset($_POST['action'])) {
             $action = $_POST['action'];
 
             $call = json_decode($action, true);
@@ -68,8 +99,19 @@ abstract class BaseController
 
     public static function jsonOut($data)
     {
-
-        CachedEcho::send(json_encode($data), 'application/json', false);
+        // Avoid CachedEcho which conflicts with output buffering
+        // Clear any existing output buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        echo json_encode($data);
+        exit;
     }
 
     /**

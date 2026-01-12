@@ -29,13 +29,25 @@ class FlmArchiveBrowser extends FlmDirBrowser {
 
     request() {
         let r = {files: [], directories: [], path: this.edit.val()};
-        let fileInfo = flm.ui.filenav.fileExists(flm.utils.basename(this.edit.val()));
+        let fileInfo = flm.ui.filenav.fileExists(flm.utils.basename(this.edit.val())) || [];
 
         return flm.api.archiveList(this.edit.val(),
             {
                 password: $("#fman-extract-password").val(),
-                background: fileInfo[1] > 1073741824
+                background: (fileInfo[1] || 0) > 1073741824
             }).then((list) => {
+
+            // New structured response (preferred)
+            if ($type(list) === 'object' && ($type(list['files']) === 'array' || $type(list['directories']) === 'array')) {
+                // Normalize files - extract 'name' property if entries are objects
+                r.files = ($type(list['files']) === 'array' ? list['files'] : []).map(f => 
+                    (typeof f === 'object' && f !== null && f.name) ? f.name : f
+                );
+                r.directories = ($type(list['directories']) === 'array' ? list['directories'] : []).map(d => 
+                    (typeof d === 'object' && d !== null && d.name) ? d.name : d
+                );
+                return r;
+            }
 
             if ($type(list['log'])) {
                 flm.debug('listing task finished', list);
@@ -68,6 +80,7 @@ class FlmArchive {
 
     constructor(config) {
         this.config = config;
+        this.autoBrowse = false;
 
         flm.EVENTS.ARCHIVE_EXTRACT = "flm.doExtract";
         flm.EVENTS.ARCHIVE_CREATE = "flm.doArchive";
@@ -86,11 +99,17 @@ class FlmArchive {
                 pathbrowse: true,
                 template: "dialog-archive_create"
             })
+            .setDialogConfig('archive_browse',
+                {
+                    modal: false,
+                    template: "dialog-archive_browse"
+                })
             .setDialogConfig('archive_extract',
                 {
                     modal: true,
                     pathbrowse: true,
                     template: "dialog-archive_extract"
+
                 });
 
     }
@@ -161,13 +180,19 @@ class FlmArchive {
 
         if (self.isArchive(path)) {
             let afterRename = flm.ui.getContextMenuEntryPosition(menu, theUILang.fRename) + 2;
-            menu.splice(afterRename, 0, [theUILang.fExtracta, () => self.showExtract()]);
+            menu.splice(afterRename, 0, [(theUILang.fBrowseA || 'Browse'), () => self.showBrowse()]);
+            menu.splice(++afterRename, 0, [theUILang.fExtracta, () => self.showExtract()]);
             menu.splice(++afterRename, 0, [CMENU_SEP]);
         }
     }
 
     showCreate = () => {
         flm.ui.dialogs.showDialog('archive_create');
+    }
+
+    showBrowse = () => {
+        flm.ui.filenav.selectedEntries = flm.ui.filenav.selectedEntries.filter((entry) => this.isArchive(entry), this);
+        flm.ui.dialogs.showDialog('archive_browse');
     }
 
     showExtract = () => {

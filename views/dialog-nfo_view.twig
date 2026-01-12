@@ -1,67 +1,118 @@
 {% extends "flm::dialog-window.twig" %}
 {% block content %}
+    <style>
+        /* IMPORTANT: the dialog id is flm_popup_nfo_view (not nfo_view) */
+        #flm_popup_nfo_view {
+            /* NOTE: don't use !important on width/height, or CSS resize gets overridden */
+            width: 90vw;
+            max-width: 1400px;
+            min-width: 600px;
+            height: 80vh;
+            max-height: 800px;
+            min-height: 400px;
+            resize: both !important;
+            overflow: auto !important;
+        }
 
-    <div>
-        {#
-        <ul class="tabbar">
+        /* Make dialog content stretch with dialog height */
+        #flm_popup_nfo_view > .cont {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+        #flm_popup_nfo_view > .cont > form {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        #flm_popup_nfo_view .flm-popup-diag-content {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
 
+        #flm_popup_nfo_view #flm_nfo_tab_content {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        #flm_popup_nfo_view .table_tab {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #flm_popup_nfo_view #flm_ace_editor {
+            flex: 1;
+            min-height: 300px;
+            height: auto;
+        }
 
-            <li id="flm_nfo_tab_view" style="z-index: 1;"><a class="selected" href="javascript://void();"
-                                                             onfocus="this.blur();">View</a>
-            </li>
-            <li id="flm_nfo_tab_edit" style="z-index: 0;"><a href="javascript://void();" onfocus="this.blur();">Edit</a>
-            </li>
-
-        </ul>
-        #}
-
-        <div id="flm_nfo_tab_content">
-            <div class="table_tab"
-                 style="">
-                <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                    <tr>
-                        <td width="8%"><strong>Format:</strong></td>
-                        <td width="92%">
-                            <select id="fMan_nfoformat" name="fMan_nfoformat">
-                                <option selected="selected" value="dos">DOS</option>
-                                <option value="win">WIN</option>
-                            </select>
-                            {% set nfoFile = buildPath([currentPath, selectedTarget]) %}
-                            <input class="flm-diag-nav-path" name="flm-diag-nav-path" type="hidden"
-                                   value="{{ selectedTarget }}"/></td>
-                    </tr>
-                </table>
-                <div id="flm_popup_nfo_view-content">
-                    <pre>Loading...</pre>
-
-                </div>
-                <span class="stable-scrollpos"></span>
-            </div>
-
-            <div class="table_tab" id="flm-nfo_view-edit" style="display: block;">
-                {#
-                <div id="editor">function foo(items) {
-                    var x = "All this is syntax highlighted";
-                    return x;
-                    }
-                </div>
-
-                <script>
-                    var editor;
-                    $(document).ready(function () {
-                        injectScript('https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.6/ace.js',
-                            function () {
-                                editor = ace.edit("editor");
-                                editor.setTheme("ace/theme/monokai");
-                                editor.session.setMode("ace/mode/javascript");
-                            });
-                    });
-                </script>
-                #}
-            </div>
+        /* Optional maximize button */
+        #flm_popup_nfo_view.flm-maximized {
+            width: 95vw;
+            height: 95vh;
+            max-width: none;
+            max-height: none;
+        }
+        #flm_popup_nfo_view .dlg-header-buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding-right: 0.25rem;
+        }
+        #flm_popup_nfo_view a.dlg-max:link,
+        #flm_popup_nfo_view a.dlg-max:visited {
+            display: block;
+            height: 14px;
+            width: 14px;
+            margin: auto 0.25rem;
+            line-height: 14px;
+            text-align: center;
+            text-decoration: none;
+            border: 1px solid var(--header-border-color);
+            border-radius: 2px;
+            color: var(--text-header-color);
+            background: transparent;
+            font-size: 12px;
+            user-select: none;
+        }
+        #flm_popup_nfo_view a.dlg-max:hover {
+            filter: brightness(1.1);
+        }
+    </style>
+    <div id="flm_nfo_tab_content">
+        <div class="table_tab" style="width: 100%; height: 100%;">
+            <table border="0" cellpadding="5" cellspacing="0" width="100%" style="margin-bottom: 10px;">
+                <tr>
+                    <td width="10%">Theme:</td>
+                    <td width="90%" colspan="3">
+                        <select id="fMan_aceTheme" name="fMan_aceTheme" style="width: 200px;">
+                            <option value="ace/theme/monokai" selected>Monokai</option>
+                            <option value="ace/theme/github">GitHub</option>
+                            <option value="ace/theme/tomorrow_night">Tomorrow Night</option>
+                            <option value="ace/theme/twilight">Twilight</option>
+                            <option value="ace/theme/solarized_dark">Solarized Dark</option>
+                            <option value="ace/theme/solarized_light">Solarized Light</option>
+                        </select>
+                        <label style="margin-left: 12px; user-select: none;">
+                            <input type="checkbox" id="fMan_aceWrap" style="vertical-align: middle; margin-right: 6px;"/>
+                            Wrap
+                        </label>
+                        {% set nfoFile = buildPath([currentPath, selectedTarget]) %}
+                        <input class="flm-diag-nav-path" name="flm-diag-nav-path" type="hidden"
+                               value="{{ selectedTarget }}"/>
+                    </td>
+                </tr>
+            </table>
+            <div id="flm_ace_editor" style="width: 100%; border: 1px solid #555; border-radius: 4px;">Loading...</div>
         </div>
     </div>
-
 
 {% endblock %}
 
@@ -70,40 +121,313 @@
 
 {% block scripts %}
     <script>
-        (function (global) {
+        (function() {
+            var editor = null;
             var dialogs = flm.ui.getDialogs();
             var diagId = dialogs.getDialogId('nfo_view');
-            var cont = $('#flm_popup_nfo_view-content pre');
+            var dialogDomId = flm.utils.ltrim(diagId, '#'); // flm_popup_nfo_view
+            var apiEndpoint = '{{ apiUrl|e('js') }}';
+            var ACE_URL = 'https://cdn.jsdelivr.net/npm/ace-builds@1.32.3/src-min-noconflict/ace.js';
+            var MODELIST_URL = 'https://cdn.jsdelivr.net/npm/ace-builds@1.32.3/src-min-noconflict/ext-modelist.js';
+            var WRAP_STORAGE_KEY = 'flm_ace_wrap';
 
-            theDialogManager.center(flm.utils.ltrim(diagId, '#'));
-
-            function getNfo(selection, mode) {
-
-                return flm.api.getNfo(selection, mode).then(
-                    function (data) {
-                        cont.empty();
-
-                        if (browser.isIE) {
-                            document.getElementById("nfo_content").innerHTML = "<pre>" + data.nfo + "</pre>";
-                        } else {
-                            cont.html(data.nfo);
-                        }
-
-                    },
-                    function (reason) {
-                        cont.text('Failed fetching .nfo data: ' + JSON.stringify(reason));
-                    }
-                );
+            function getContainer() {
+                return document.getElementById('flm_ace_editor');
             }
 
-            $("#fMan_nfoformat").change(function () {
-                var mode = $(this).val();
-                getNfo(dialogs.getTargetPath(diagId), mode);
+            function loadScriptAsync(url, callback) {
+                // Check if already loaded
+                if (url.indexOf('ace.js') !== -1 && typeof window.ace !== 'undefined') {
+                    callback(null);
+                    return;
+                }
+                var script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = url;
+                script.onload = function() { callback(null); };
+                script.onerror = function() { callback(new Error('Failed to load: ' + url)); };
+                document.head.appendChild(script);
+            }
+
+            function loadAce(callback) {
+                loadScriptAsync(ACE_URL, function(err) {
+                    if (err) {
+                        callback(err);
+                        return;
+                    }
+                    // Load modelist extension (optional, ignore errors)
+                    loadScriptAsync(MODELIST_URL, function() {
+                        callback(null);
+                    });
+                });
+            }
+
+            function initEditor() {
+                var container = getContainer();
+                if (!container) {
+                    console.error('ACE container not found');
+                    return false;
+                }
+                if (typeof window.ace === 'undefined') {
+                    container.textContent = 'Error: ACE library not loaded';
+                    console.error('ACE library not loaded');
+                    return false;
+                }
+                try {
+                    editor = window.ace.edit(container);
+                    editor.setTheme('ace/theme/monokai');
+                    editor.setReadOnly(true);
+                    editor.setShowPrintMargin(false);
+                    editor.setOptions({
+                        fontSize: '10pt',
+                        useWorker: false
+                    });
+
+                    // Wrap from persisted setting
+                    try {
+                        var wrapPref = localStorage.getItem(WRAP_STORAGE_KEY);
+                        var wrapEnabled = (wrapPref === '1');
+                        var wrapCheckbox = document.getElementById('fMan_aceWrap');
+                        if (wrapCheckbox) wrapCheckbox.checked = wrapEnabled;
+                        editor.session.setUseWrapMode(!!wrapEnabled);
+                    } catch (e) {}
+
+                    return true;
+                } catch (e) {
+                    console.error('Failed to init ACE:', e);
+                    container.textContent = 'Error initializing editor: ' + e.message;
+                    return false;
+                }
+            }
+
+            function detectMode(filename) {
+                var ext = (filename || '').split('.').pop().toLowerCase();
+                var textExts = ['log', 'nfo', 'sfv', 'md5', 'diz', 'txt', 'rc', 'out', 'sh', 'py', 'js', 'php', 'html', 'css', 'xml', 'json', 'yml', 'yaml', 'ini', 'conf', 'cfg', 'md', 'mk', 'make', 'bat', 'ps1', 'sql', 'csv', 'tsv'];
+                if (textExts.indexOf(ext) !== -1) return 'ace/mode/text';
+                
+                // Try ACE's built-in modelist for other extensions
+                try {
+                    if (window.ace && window.ace.require) {
+                        var modelist = window.ace.require('ace/ext/modelist');
+                        if (modelist && modelist.getModeForPath) {
+                            var mode = modelist.getModeForPath(filename).mode;
+                            // Only use specific modes, fallback to text for unknown
+                            if (mode && mode !== 'ace/mode/text' && mode.indexOf('ace/mode/') === 0) {
+                                return mode;
+                            }
+                        }
+                    }
+                } catch (e) {}
+                
+                // Default to text mode for all files
+                return 'ace/mode/text';
+            }
+
+            function loadFileContent(filepath) {
+                if (!editor && !initEditor()) return;
+                editor.setValue('Loading file...', -1);
+
+                // Use raw endpoint to avoid huge JSON encoding/parsing overhead.
+                // Increase timeout for large files (5 minutes)
+                var timeoutMs = 300000;
+                var payload = { method: 'viewNfoRaw', target: filepath };
+                var startTime = Date.now();
+
+                console.log('Starting file load for:', filepath);
+                $.ajax({
+                    type: 'POST',
+                    url: apiEndpoint + '?_=' + Math.floor(Date.now() / 1000),
+                    timeout: timeoutMs,
+                    async: true,
+                    cache: false,
+                    data: { action: flm.utils.json_encode(payload) },
+                    dataType: 'text',
+                    success: function(text) {
+                        var endTime = Date.now();
+                        var duration = (endTime - startTime) / 1000;
+                        console.log('File loaded successfully in', duration, 'seconds, size:', text.length, 'chars');
+                        if (typeof text !== 'string' || text.trim() === '') {
+                            text = '(File is empty)';
+                        }
+                        editor.setValue(text, -1);
+                        editor.session.setMode(detectMode(filepath));
+                        editor.clearSelection();
+                        editor.gotoLine(1);
+                        editor.resize();
+                    },
+                    error: function(xhr, textStatus, errorThrown) {
+                        var endTime = Date.now();
+                        var duration = (endTime - startTime) / 1000;
+                        console.error('File load failed after', duration, 'seconds:', textStatus, errorThrown);
+                        console.error('API error:', textStatus, errorThrown);
+                        var msg = 'Error loading file';
+                        if (xhr && xhr.status) {
+                            msg = 'HTTP ' + xhr.status + ': ' + (xhr.statusText || textStatus || '');
+                        } else if (textStatus) {
+                            msg = 'Error: ' + textStatus;
+                        }
+                        editor.setValue(msg, -1);
+                    }
+                });
+            }
+
+            function ensureAceResizesWithDialog() {
+                try {
+                    var el = document.getElementById(dialogDomId);
+                    if (!el || !window.ResizeObserver) return;
+                    if (el.__flmAceResizeObserver) return;
+                    el.__flmAceResizeObserver = new ResizeObserver(function() {
+                        if (editor) editor.resize();
+                    });
+                    el.__flmAceResizeObserver.observe(el);
+                } catch (e) {
+                    console.log('ResizeObserver setup error:', e);
+                }
+            }
+
+            function ensureMaximizeButton() {
+                try {
+                    var dlg = document.getElementById(dialogDomId);
+                    if (!dlg) return false;
+                    var header = dlg.querySelector('.dlg-header');
+                    if (!header) return false;
+
+                    if (!header.__flmMaxButtonReady) {
+                        header.__flmMaxButtonReady = true;
+
+                        var closeBtn = header.querySelector('a.dlg-close');
+                        if (!closeBtn) return false;
+
+                        var btnWrap = document.createElement('div');
+                        btnWrap.className = 'dlg-header-buttons';
+
+                        var maxBtn = document.createElement('a');
+                        maxBtn.href = '#';
+                        maxBtn.className = 'dlg-max';
+                        maxBtn.title = 'Maximize/Restore';
+                        maxBtn.textContent = '▢';
+
+                        maxBtn.addEventListener('click', function(ev) {
+                            ev.preventDefault();
+
+                            if (!dlg.classList.contains('flm-maximized')) {
+                                dlg.__flmPrevGeom = {
+                                    width: dlg.style.width,
+                                    height: dlg.style.height,
+                                    left: dlg.style.left,
+                                    top: dlg.style.top,
+                                };
+                                dlg.classList.add('flm-maximized');
+                                dlg.style.left = '2.5vw';
+                                dlg.style.top = '2.5vh';
+                                dlg.style.width = '95vw';
+                                dlg.style.height = '95vh';
+                            } else {
+                                dlg.classList.remove('flm-maximized');
+                                var g = dlg.__flmPrevGeom || {};
+                                dlg.style.width = g.width || '';
+                                dlg.style.height = g.height || '';
+                                dlg.style.left = g.left || '';
+                                dlg.style.top = g.top || '';
+                            }
+
+                            if (editor) {
+                                setTimeout(function() { editor.resize(); }, 0);
+                            }
+                        });
+
+                        // Move close button into wrapper, keep layout stable
+                        closeBtn.parentNode.insertBefore(btnWrap, closeBtn);
+                        btnWrap.appendChild(maxBtn);
+                        btnWrap.appendChild(closeBtn);
+                    }
+                    return true;
+                } catch (e) {
+                    console.log('Maximize button setup error:', e);
+                    return false;
+                }
+            }
+
+            function ensureMaximizeButtonWithRetry(triesLeft) {
+                if (ensureMaximizeButton()) return;
+                if (triesLeft <= 0) return;
+                setTimeout(function() { ensureMaximizeButtonWithRetry(triesLeft - 1); }, 50);
+            }
+
+            function ensureInitialDialogSize() {
+                try {
+                    var el = document.getElementById(dialogDomId);
+                    if (!el) return;
+                    // Only set once; after that let the user resize freely.
+                    if (el.__flmInitialSizeSet) return;
+                    el.__flmInitialSizeSet = true;
+                    el.style.width = Math.min(1400, Math.floor(window.innerWidth * 0.9)) + 'px';
+                    el.style.height = Math.min(800, Math.floor(window.innerHeight * 0.8)) + 'px';
+                } catch (e) {
+                    console.log('Initial size setup error:', e);
+                }
+            }
+
+            // Hook into ruTorrent dialog lifecycle WITHOUT overwriting existing handlers
+            if (theDialogManager && theDialogManager.addHandler) {
+                theDialogManager.addHandler(dialogDomId, 'afterShow', function() {
+                    ensureInitialDialogSize();
+                    ensureAceResizesWithDialog();
+                    ensureMaximizeButton();
+                    if (editor) editor.resize();
+                });
+            }
+
+            // Event handlers for theme
+            $(document).off('change.aceTheme').on('change.aceTheme', '#fMan_aceTheme', function() {
+                if (editor) editor.setTheme($(this).val());
             });
 
-            getNfo(dialogs.getTargetPath(diagId), $('#fMan_nfoformat').val());
-        })
-        (window);
+            // Event handler for wrap
+            $(document).off('change.aceWrap').on('change.aceWrap', '#fMan_aceWrap', function() {
+                try {
+                    var enabled = $(this).is(':checked');
+                    if (editor) {
+                        editor.session.setUseWrapMode(!!enabled);
+                        setTimeout(function() { editor.resize(); }, 0);
+                    }
+                    localStorage.setItem(WRAP_STORAGE_KEY, enabled ? '1' : '0');
+                } catch (e) {}
+            });
+
+            // Main entry point
+            setTimeout(function() {
+                var container = getContainer();
+                if (!container) {
+                    console.error('Container not found');
+                    return;
+                }
+                container.textContent = 'Loading ACE Editor...';
+
+                // First open: the dialog is already shown before this script runs,
+                // so we must inject the maximize button immediately (with retry).
+                ensureMaximizeButtonWithRetry(20);
+
+                loadAce(function(err) {
+                    if (err) {
+                        console.error('Failed to load ACE:', err);
+                        container.textContent = 'Error loading ACE Editor from CDN: ' + err.message;
+                        return;
+                    }
+                    console.log('ACE loaded successfully');
+                    if (initEditor()) {
+                        try {
+                            var filepath = dialogs.getTargetPath(diagId);
+                            console.log('Loading file:', filepath);
+                            loadFileContent(filepath);
+                        } catch (e) {
+                            console.error('Error getting file path:', e);
+                            if (editor) editor.setValue('Error: ' + e.message, -1);
+                        }
+                    }
+                });
+            }, 50);
+        })();
     </script>
 {% endblock %}
 

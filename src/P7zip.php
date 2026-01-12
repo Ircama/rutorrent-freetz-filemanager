@@ -61,6 +61,8 @@ class P7zip extends ShellCmd
     public function __construct(string $binPath = '7z')
     {
         parent::__construct($binPath);
+        // Set P7ZIP_HOME_DIR to ensure 7z finds its libraries even when executed from external paths
+        $this->setEnvVar('P7ZIP_HOME_DIR', '/usr/lib/p7zip');
     }
 
     /**
@@ -187,6 +189,22 @@ class P7zip extends ShellCmd
             ->pipe(ShellCmd::bin('awk', ['/------------------------/{flag=1; next} flag {print} /-------------------/{exit}']));
 
         ($limit > 0) && $self->pipe(ShellCmd::bin("awk ", ['NR<='.$limit.' {print}']));
+
+        return $self;
+    }
+
+    /**
+     * More robust listing for parsing: 7z l -slt (technical key/value output).
+     * This avoids locale-dependent table formatting.
+     */
+    public static function listSlt($file)
+    {
+        $self = new static();
+        $self->setCommand(static::LIST_COMMAND)
+            ->setArchiveFile($file)
+            ->disableArchiveFile(false);
+            // Temporarily disable -slt as it may not work correctly with RAR archives
+            // ->setArg('-slt', true);
 
         return $self;
     }

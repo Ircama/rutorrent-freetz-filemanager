@@ -1,0 +1,190 @@
+{% set multiselect = false %}
+
+{% extends "flm::dialog-window.twig" %}
+
+{% block heading %}
+    {{ window.pathBrowser(selectedTarget, theUILang.fBrowseA|default('Browse...'), "fman-archive-file", "disabled readonly") }}
+{% endblock %}
+
+{% block content %}
+    <style>
+        /* Dedicated (non-modal) browse dialog: allow resizing and show a scrollable list */
+        #flm_popup_archive_browse {
+            width: 90vw;
+            max-width: 1400px;
+            min-width: 600px;
+            height: 80vh;
+            max-height: 800px;
+            min-height: 400px;
+            resize: both !important;
+            overflow: auto !important;
+        }
+        #flm_popup_archive_browse > .cont {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+        #flm_popup_archive_browse > .cont > form {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        #flm_popup_archive_browse .flm-popup-diag-content {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        #flm_popup_archive_browse #flm_archive_list {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+        }
+        #flm_popup_archive_browse .flm-archive-item {
+            white-space: pre;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+    </style>
+
+    <fieldset class="mb-2">
+        <legend>{{ theUILang.fDiagOptions }}</legend>
+        <div class="mt-2 row">
+            {{ window.passwordField("fman-extract-password", "Password") }}
+        </div>
+    </fieldset>
+
+    <div id="flm_archive_list" class="mt-2">
+        <div class="flm-archive-item">Loading...</div>
+    </div>
+{% endblock %}
+
+{% block buttons %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        (function () {
+            var dialogs = flm.ui.getDialogs();
+            var diagId = dialogs.getDialogId('archive_browse');
+            var $diag = $(diagId);
+
+            function parse7zList(lines) {
+                var items = [];
+                if (!$type(lines)) return items;
+
+                // task wrapper may return {log, finish} or plain array
+                if ($type(lines['log'])) {
+                    if (lines['log'].length > 0) {
+                        lines = lines['log'];
+                    } else {
+                        lines = thePlugins.get("_task").readConsoleLog().split('\n');
+                    }
+                }
+
+                if ($type(lines) !== 'array') return items;
+
+                lines.forEach(function (v) {
+                    if (!v) return;
+                    var m = v.match(/^(?<date>(([\d-]+) ([\d:]+)|[\s]+)) ((\.+)?(?<type>[\w.])(\.+)?) (?<size>[\d\s]+) (?<perm>[\d\s]+) (?<name>.+)/);
+                    if (m && m.groups && m.groups.name) {
+                        items.push({
+                            type: (m.groups.type || '').toLowerCase(),
+                            name: (m.groups.name || '').trim()
+                        });
+                    } else {
+                        v = (v + '').trim();
+                        if (v !== '') items.push({type: '', name: v});
+                    }
+                });
+
+                return items;
+            }
+
+            function renderItems(items) {
+                var $list = $diag.find('#flm_archive_list');
+                $list.empty();
+
+                if (!items || items.length === 0) {
+                    $list.append($('<div>').addClass('flm-archive-item').text('No entries'));
+                    return;
+                }
+
+                items.forEach(function (it) {
+                    var prefix = (it.type === 'd') ? '[DIR]  ' : '       ';
+                    $list.append($('<div>').addClass('flm-archive-item').text(prefix + it.name));
+                });
+            }
+
+            function renderRawOutput(output) {
+                var $list = $diag.find('#flm_archive_list');
+                $list.empty();
+                
+                if (!output || output.length === 0) {
+                    $list.append($('<div>').addClass('flm-archive-item').text('No output'));
+                    return;
+                }
+                
+                // Show raw 7z output line by line
+                var lines = output.split('\n');
+                lines.forEach(function(line) {
+                    $list.append($('<div>').addClass('flm-archive-item').text(line));
+                });
+            }
+
+            function loadList() {
+                var archivePath = $diag.find('.fman-archive-file').val();
+                var password = $('#fman-extract-password').val();
+                if (!archivePath) {
+                    renderItems([]);
+                    return;
+                }
+                $diag.find('#flm_archive_list').html('<div class="flm-archive-item">Loading...</div>');
+
+                flm.api.archiveList(archivePath, {password: password, background: false})
+                    .then(function (res) {
+                        // Check if we have raw output string
+                        if ($type(res) === 'object' && res['raw_output']) {
+                            renderRawOutput(res['raw_output']);
+                            return;
+                        }
+                        
+                        if ($type(res) === 'object' && ($type(res['files']) === 'array' || $type(res['directories']) === 'array')) {
+                            var items = [];
+                            ($type(res['directories']) === 'array') && res['directories'].forEach(function (d) {
+                                var name = (typeof d === 'object' && d !== null && d.name) ? d.name : d;
+                                items.push({type: 'd', name: name});
+                            });
+                            ($type(res['files']) === 'array') && res['files'].forEach(function (f) {
+                                var name = (typeof f === 'object' && f !== null && f.name) ? f.name : f;
+                                items.push({type: 'f', name: name});
+                            });
+                            renderItems(items);
+                        } else {
+                            renderItems(parse7zList(res));
+                        }
+                    })
+                    .catch(function (e) {
+                        console.log('archiveList failed', e);
+                        $diag.find('#flm_archive_list').html('<div class="flm-archive-item">Error loading archive list</div>');
+                    });
+            }
+
+            // initial load after dialog is in DOM
+            setTimeout(function () {
+                loadList();
+                $('#fman-extract-password').on('change', function () {
+                    loadList();
+                });
+            });
+        })();
+    </script>
+{% endblock %}

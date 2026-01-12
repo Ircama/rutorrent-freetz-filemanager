@@ -9,3 +9,7 @@ require_once(__DIR__ . '/../_task/task.php');
 require_once(__DIR__ . '/src/Helper.php');
 Helper::registerAutoload();
 
+// Disable autoloader diagnostic warnings
+global $al_diagnostic;
+$al_diagnostic = false;
+

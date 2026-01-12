@@ -6,106 +6,87 @@ use Exception;
 
 class NfoView
 {
-
     public $file;
 
     public function __construct($file)
     {
-
         $this->file = $file;
     }
 
     /**
-     * @param bool $dos
-     * @return mixed
+     * Get file contents as plain text for ACE editor
+     * @return string
      * @throws Exception
      */
-    public function get($dos = false)
+    public function get()
     {
+        $startTime = microtime(true);
+        // Large file reads can be slow on embedded devices; allow more time.
+        @set_time_limit(300);
+        // Try to raise memory limit to reduce failures around a few MiB.
+        // (May be ignored depending on PHP configuration.)
+        @ini_set('memory_limit', '256M');
 
-        if (($contents = file_get_contents($this->file)) === false) {
+        $fileSize = filesize($this->file);
+        $tailThreshold = 102400; // 100KB
 
-            throw new Exception("Cannot get file contents " . $this->file, 3);
+        if ($fileSize > $tailThreshold) {
+            // For large files, show the last 150KB to avoid loading huge content
+            $tailSize = 153600; // 150KB
+            $startPos = max(0, $fileSize - $tailSize);
+            $contents = file_get_contents($this->file, false, null, $startPos, $tailSize);
+            if ($contents === false) {
+                throw new Exception("Cannot get file contents " . $this->file, 3);
+            }
+            $contents = "... [Showing last 150KB of " . round($fileSize/1024/1024, 2) . "MB file] ...\n\n" . $contents;
+        } else {
+            // For smaller files, show full content
+            $contents = file_get_contents($this->file);
+            if ($contents === false) {
+                throw new Exception("Cannot get file contents " . $this->file, 3);
+            }
         }
 
-
-        $output = $dos ? self::dos_format($contents, TRUE) : htmlentities($contents);
-
-
-        return $output;
+        // Ensure valid UTF-8 for JSON encoding
+        $contents = self::toValidUtf8($contents);
+        
+        $endTime = microtime(true);
+        $duration = $endTime - $startTime;
+        error_log("NfoView::get() - File: {$this->file}, Size: {$fileSize} bytes, Duration: {$duration} seconds");
+        
+        return $contents;
     }
-
-    public static function dos_format($ibm_437, $swedishmagic = false)
+    
+    /**
+     * Convert string to valid UTF-8, replacing invalid sequences
+     */
+    private static function toValidUtf8($str)
     {
-
-        $table437 = ["\200", "\201", "\202", "\203", "\204", "\205", "\206", "\207",
-            "\210", "\211", "\212", "\213", "\214", "\215", "\216", "\217", "\220",
-            "\221", "\222", "\223", "\224", "\225", "\226", "\227", "\230", "\231",
-            "\232", "\233", "\234", "\235", "\236", "\237", "\240", "\241", "\242",
-            "\243", "\244", "\245", "\246", "\247", "\250", "\251", "\252", "\253",
-            "\254", "\255", "\256", "\257", "\260", "\261", "\262", "\263", "\264",
-            "\265", "\266", "\267", "\270", "\271", "\272", "\273", "\274", "\275",
-            "\276", "\277", "\300", "\301", "\302", "\303", "\304", "\305", "\306",
-            "\307", "\310", "\311", "\312", "\313", "\314", "\315", "\316", "\317",
-            "\320", "\321", "\322", "\323", "\324", "\325", "\326", "\327", "\330",
-            "\331", "\332", "\333", "\334", "\335", "\336", "\337", "\340", "\341",
-            "\342", "\343", "\344", "\345", "\346", "\347", "\350", "\351", "\352",
-            "\353", "\354", "\355", "\356", "\357", "\360", "\361", "\362", "\363",
-            "\364", "\365", "\366", "\367", "\370", "\371", "\372", "\373", "\374",
-            "\375", "\376", "\377"];
-
-        $tablehtml = ["&#x00c7;", "&#x00fc;", "&#x00e9;", "&#x00e2;", "&#x00e4;",
-            "&#x00e0;", "&#x00e5;", "&#x00e7;", "&#x00ea;", "&#x00eb;", "&#x00e8;",
-            "&#x00ef;", "&#x00ee;", "&#x00ec;", "&#x00c4;", "&#x00c5;", "&#x00c9;",
-            "&#x00e6;", "&#x00c6;", "&#x00f4;", "&#x00f6;", "&#x00f2;", "&#x00fb;",
-            "&#x00f9;", "&#x00ff;", "&#x00d6;", "&#x00dc;", "&#x00a2;", "&#x00a3;",
-            "&#x00a5;", "&#x20a7;", "&#x0192;", "&#x00e1;", "&#x00ed;", "&#x00f3;",
-            "&#x00fa;", "&#x00f1;", "&#x00d1;", "&#x00aa;", "&#x00ba;", "&#x00bf;",
-            "&#x2310;", "&#x00ac;", "&#x00bd;", "&#x00bc;", "&#x00a1;", "&#x00ab;",
-            "&#x00bb;", "&#x2591;", "&#x2592;", "&#x2593;", "&#x2502;", "&#x2524;",
-            "&#x2561;", "&#x2562;", "&#x2556;", "&#x2555;", "&#x2563;", "&#x2551;",
-            "&#x2557;", "&#x255d;", "&#x255c;", "&#x255b;", "&#x2510;", "&#x2514;",
-            "&#x2534;", "&#x252c;", "&#x251c;", "&#x2500;", "&#x253c;", "&#x255e;",
-            "&#x255f;", "&#x255a;", "&#x2554;", "&#x2569;", "&#x2566;", "&#x2560;",
-            "&#x2550;", "&#x256c;", "&#x2567;", "&#x2568;", "&#x2564;", "&#x2565;",
-            "&#x2559;", "&#x2558;", "&#x2552;", "&#x2553;", "&#x256b;", "&#x256a;",
-            "&#x2518;", "&#x250c;", "&#x2588;", "&#x2584;", "&#x258c;", "&#x2590;",
-            "&#x2580;", "&#x03b1;", "&#x00df;", "&#x0393;", "&#x03c0;", "&#x03a3;",
-            "&#x03c3;", "&#x03bc;", "&#x03c4;", "&#x03a6;", "&#x0398;", "&#x03a9;",
-            "&#x03b4;", "&#x221e;", "&#x03c6;", "&#x03b5;", "&#x2229;", "&#x2261;",
-            "&#x00b1;", "&#x2265;", "&#x2264;", "&#x2320;", "&#x2321;", "&#x00f7;",
-            "&#x2248;", "&#x00b0;", "&#x2219;", "&#x00b7;", "&#x221a;", "&#x207f;",
-            "&#x00b2;", "&#x25a0;", "&#x00a0;"];
-
-        $s = htmlspecialchars($ibm_437, ENT_COMPAT | ENT_HTML401, 'ISO-8859-1');
-
-
-        $control = ["\000", "\001", "\002", "\003", "\004", "\005", "\006", "\007",
-            "\010", "\011", /*"\012",*/
-            "\013", "\014", /*"\015",*/
-            "\016", "\017",
-            "\020", "\021", "\022", "\023", "\024", "\025", "\026", "\027",
-            "\030", "\031", "\032", "\033", "\034", "\035", "\036", "\037",
-            "\177"];
-
-        $s = str_replace($control, " ", $s);
-
-        if ($swedishmagic) {
-            $s = str_replace("\345", "\206", $s); // Code windows "?" to dos.
-            $s = str_replace("\344", "\204", $s); // Code windows "�" to dos.
-            $s = str_replace("\366", "\224", $s); // Code windows "�" to dos.
-
-
-            $s = preg_replace("/([ -~])\305([ -~])/", '${1}\217${2}', $s); // ?
-            $s = preg_replace("/([ -~])\304([ -~])/", '${1}\216${2}', $s); // �
-            $s = preg_replace("/([ -~])\326([ -~])/", '${1}\231${2}', $s); // �
-
-            $s = str_replace("\311", "\220", $s); // �
-            $s = str_replace("\351", "\202", $s); // �
+        // Try iconv first (more reliable)
+        if (function_exists('iconv')) {
+            $result = @iconv('UTF-8', 'UTF-8//IGNORE', $str);
+            if ($result !== false) {
+                return $result;
+            }
         }
-
-        $s = str_replace($table437, $tablehtml, $s);
-        return $s;
+        
+        // Fallback: filter to ASCII + valid UTF-8 continuation
+        $result = '';
+        $len = strlen($str);
+        for ($i = 0; $i < $len; $i++) {
+            $byte = ord($str[$i]);
+            // ASCII printable + newline/tab/CR
+            if (($byte >= 32 && $byte <= 126) || $byte == 9 || $byte == 10 || $byte == 13) {
+                $result .= $str[$i];
+            } elseif ($byte >= 194 && $byte <= 244) {
+                // Start of multi-byte UTF-8 sequence
+                $result .= $str[$i];
+            } elseif ($byte >= 128 && $byte <= 191) {
+                // Continuation byte
+                $result .= $str[$i];
+            }
+            // Skip other bytes (invalid UTF-8)
+        }
+        return $result;
     }
-
 }

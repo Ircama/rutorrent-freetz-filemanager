@@ -55,7 +55,13 @@
             ));
 
             // dialog has not been created in dom yet
-            multiple || setTimeout(() => flm.archive.setArchiveBrowser(diagId, archive_file[0].id));
+            multiple || setTimeout(() => {
+                const browser = flm.archive.setArchiveBrowser(diagId, archive_file[0].id);
+                if (flm.archive.autoBrowse) {
+                    flm.archive.autoBrowse = false;
+                    browser && browser.show && browser.show();
+                }
+            });
 
         })(flm.ui.getDialogs());
     </script>

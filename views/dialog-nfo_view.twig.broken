@@ -1,0 +1,66 @@
+{% extends "flm::dialog-window.twig" %}
+{% block content %}
+    <div style="min-width: 800px;">
+        <div id="flm_nfo_tab_content" style="width: 100%;">
+            <div class="table_tab">
+                <table border="0" cellpadding="5" cellspacing="0" width="100%">
+                    <tr>
+                        <td><strong>Theme:</strong></td>
+                        <td><select id="fMan_aceTheme"><option value="ace/theme/monokai" selected>Monokai</option><option value="ace/theme/github">GitHub</option></select></td>
+                        <td><input type="checkbox" id="fMan_aceWrap"/> Line wrap
+                            {% set nfoFile = buildPath([currentPath, selectedTarget]) %}
+                            <input class="flm-diag-nav-path" type="hidden" value="{{ selectedTarget }}"/>
+                        </td>
+                    </tr>
+                </table>
+                <div id="flm_ace_editor" style="width: 100%; height: 550px; border: 1px solid #555;">Loading...</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block buttons %}
+{% endblock %}
+{% block scripts %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-modelist.js"></script>
+    <script>
+        (function () {
+            var dialogs = flm.ui.getDialogs();
+            var diagId = dialogs.getDialogId('nfo_view');
+            var editor = null;
+            var editorContainer = document.getElementById('flm_ace_editor');
+            var d = $(diagId);
+            if (d.length) d.css({'width': '90%', 'max-width': '1400px', 'min-width': '800px'});
+            theDialogManager.center(flm.utils.ltrim(diagId, '#'));
+            function initEditor() {
+                editor = ace.edit("flm_ace_editor");
+                editor.setTheme("ace/theme/monokai");
+                editor.setReadOnly(true);
+                editor.setShowPrintMargin(false);
+                editor.setOptions({fontSize: "12pt", wrap: false, useWorker: false});
+            }
+            function loadFile(filepath) {
+                setTimeout(function() {
+                    if (!editor)initEditor();
+                    editorContainer.textContent = 'Loading...';
+                    flm.api.getNfo(filepath, 'win').then(function (data) {
+                        if (editor) {
+                            editor.setValue(data.nfo, -1);
+                            var modelist = ace.require("ace/ext/modelist");
+                            editor.session.setMode(modelist.getModeForPath(filepath).mode);
+                            editor.resize();
+                            editor.clearSelection();
+                            editor.gotoLine(1);
+                        }
+                    }, function (reason) {
+                        if (editor) editor.setValue('Error: ' + JSON.stringify(reason), -1);
+                        else editorContainer.textContent = 'Error: ' + JSON.stringify(reason);
+                    });
+                }, 300);
+            }
+            $("#fMan_aceTheme").change(function () { if (editor) editor.setTheme($(this).val()); });
+            $("#fMan_aceWrap").change(function () { if (editor) editor.session.setUseWrapMode(this.checked); });
+            loadFile(dialogs.getTargetPath(diagId));
+        })();
+    </script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "flm::dialog-window.twig" %}
+{% block content %}
+    <style>
+        /* IMPORTANT: the dialog id is flm_popup_image_view (not image_view) */
+        #flm_popup_image_view {
+            width: auto;
+            max-width: 90vw;
+            min-width: 400px;
+            height: auto;
+            max-height: 90vh;
+            min-height: 300px;
+            resize: both !important;
+            overflow: auto !important;
+        }
+
+        /* Center the image */
+        #flm_popup_image_view .flm-popup-diag-content {
+            text-align: center;
+            padding: 10px;
+        }
+
+        #flm_popup_image_view #flm_image_display {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+    </style>
+
+    <div class="flm-popup-diag-content">
+        <img id="flm_image_display" src="" alt="Loading image..." />
+    </div>
+
+    <script>
+        (function() {
+            var dialogDomId = 'flm_popup_image_view';
+            var imgElement = document.getElementById('flm_image_display');
+            var apiEndpoint = '{{ apiUrl|e('js') }}';
+            var imageEndpoint = apiEndpoint;
+            // selectedTarget already contains the correct path (usually absolute-from-root like /foo/bar.jpg)
+            // so don't join it with currentPath (that can duplicate path segments)
+            var initialFile = '{{ selectedTarget|e('js') }}';
+
+            function loadImage(filepath) {
+                if (!filepath) {
+                    imgElement.src = '';
+                    imgElement.alt = 'No file selected';
+                    return;
+                }
+
+                if (!imageEndpoint) {
+                    imgElement.src = '';
+                    imgElement.alt = 'Cannot resolve image endpoint';
+                    return;
+                }
+
+                var imgUrl = imageEndpoint + '?_=' + Math.floor(Date.now() / 1000) + '&method=viewImage&target=' + encodeURIComponent(filepath);
+                imgElement.src = imgUrl;
+                imgElement.alt = filepath.split('/').pop();
+            }
+
+            // Load image when dialog opens
+            loadImage(initialFile);
+
+            imgElement.addEventListener('error', function() {
+                // Browser keeps showing the last alt text; add a hint.
+                if (!imgElement.alt || imgElement.alt === 'Loading image...') {
+                    imgElement.alt = 'Error loading image';
+                } else {
+                    imgElement.alt = imgElement.alt + ' (error loading image)';
+                }
+            });
+
+            // Handle dialog resize to fit image
+            var resizeObserver = new ResizeObserver(function(entries) {
+                // Could adjust image size if needed
+            });
+            if (document.getElementById(dialogDomId)) {
+                resizeObserver.observe(document.getElementById(dialogDomId));
+            }
+
+        })();
+    </script>
+{% endblock %}

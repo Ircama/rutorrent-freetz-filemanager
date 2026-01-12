@@ -35,7 +35,7 @@ class Helper
             if (file_exists($file)) {
                 require $file;
             }
-        });
+        }, true, true);
     }
 
     public static function makeRelative($a = [])

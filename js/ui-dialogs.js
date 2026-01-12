@@ -114,6 +114,10 @@ export function FileManagerDialogs(browser) {
         nfo_view: {
             modal: false,
             template: "dialog-nfo_view"
+        },
+        image_view: {
+            modal: false,
+            template: "dialog-image_view"
         }
     };
 
@@ -336,6 +340,7 @@ export function FileManagerDialogs(browser) {
             self.dirBrowser[diagId] = {};
         }
         self.dirBrowser[diagId][browser.edit.id] = browser;
+        return browser;
     }
 
     self.createDialog = (diagId, content, config, viewEvents, what) => {
@@ -349,6 +354,26 @@ export function FileManagerDialogs(browser) {
 
         self.getDialogHeader(diagId)
             .prepend('<icon class="flm-sprite-diag flm-sprite sprite-' + what + '"></icon>');
+
+        // Configure dialog dimensions and resizability
+        if (config.options) {
+            const $dialog = $(diagId);
+            if ($dialog.length && $dialog.dialog) {
+                const dialogOptions = {};
+                if (config.options.width) dialogOptions.width = config.options.width;
+                if (config.options.height) dialogOptions.height = config.options.height;
+                if (config.options.minWidth) dialogOptions.minWidth = config.options.minWidth;
+                if (config.options.minHeight) dialogOptions.minHeight = config.options.minHeight;
+                dialogOptions.resizable = true;
+                dialogOptions.draggable = true;
+                
+                try {
+                    $dialog.dialog('option', dialogOptions);
+                } catch(e) {
+                    console.log('Failed to set dialog options:', e);
+                }
+            }
+        }
 
         self.bindKeys(diagId);
 

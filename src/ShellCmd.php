@@ -13,6 +13,7 @@ class ShellCmd
     const CMD_END = '';
     protected $binary = '';
     protected $args = [];
+    protected $envVars = [];
     /**
      * @var int
      */
@@ -75,6 +76,12 @@ class ShellCmd
             throw new Exception("Command binary not set");
         }
 
+        // Add environment variables prefix
+        $envPrefix = '';
+        foreach ($this->envVars as $name => $value) {
+            $envPrefix .= $name . '=' . escapeshellarg($value) . ' ';
+        }
+
         $formatted_args = [];
         //compile arguments
         array_walk($this->args, function (&$item, $key) use (&$formatted_args) {
@@ -104,7 +111,7 @@ class ShellCmd
             }
         });
 
-        $cmd = array_merge([$this->binary], $formatted_args);
+        $cmd = array_merge([$envPrefix . $this->binary], $formatted_args);
 
         return $asArray ? $cmd : implode(" ", $cmd);
     }
@@ -201,5 +208,17 @@ class ShellCmd
     public function getArg($name)
     {
         return $this->args[$name];
+    }
+
+    /**
+     * Set an environment variable for command execution
+     * @param string $name
+     * @param string $value
+     * @return ShellCmd
+     */
+    public function setEnvVar(string $name, string $value): static
+    {
+        $this->envVars[$name] = $value;
+        return $this;
     }
 }

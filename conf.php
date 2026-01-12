@@ -1,70 +1,49 @@
 <?php
+// Filemanager configuration for Freetz-NG
 
-global $pathToExternals;
-// set with fullpath to binary or leave empty
-$pathToExternals['rar'] = '';
-$pathToExternals['7zip'] = '/usr/bin/7z';
+// NOTE: nelu/rutorrent-filemanager expects a $config array.
+$config = array();
 
+// Root directory for filemanager.
+// Keep it aligned with ruTorrent's top directory (RU_TOP_DIR -> $topDirectory).
+global $topDirectory;
+$root = $_ENV['RU_TOP_DIR'] ?? $topDirectory ?? '/';
+$config['root'] = rtrim($root, '/') . '/';
+
+// Archive support with 7zip
+// - `archive.type` controls the formats offered by the *create* dialog.
+// - `extensions.fileExtract` controls which files are treated as archives for extract/browse.
+$config['archive']['bin'] = '/usr/bin/7z';
+$config['archive']['type']['7z'] = array(
+	'bin' => '/usr/bin/7z',
+	'compression' => array(0, 1, 3, 5, 7, 9),
+);
+$config['archive']['type']['zip'] = array(
+	'bin' => '/usr/bin/7z',
+	'compression' => array(0, 1, 3, 5, 7, 9),
+);
+$config['archive']['type']['tar'] = array(
+	'bin' => '/usr/bin/7z',
+	'compression' => array(0),
+	'has_password' => false,
+);
+
+// Archives that can be extracted/browsed (rar/7z/zip/tar/tgz/etc.).
+// Used by JS as a RegExp suffix (it appends `$` itself).
+$config['extensions']['fileExtract'] = '\\.(?:7z|zip|rar|tar|tgz|gz|bz2|tbz|tbz2|xz|txz|zst|tzst|cab|iso|arj|lha|lzh)$';
+
+// Checksum support with SHA256
+$config['extensions']['checksum']['SHA256'] = 'sha256sum';
+
+// Text file extensions
+// All file extensions are allowed for viewing (up to plugin limits)
+// $config['extensions']['text'] = 'txt|nfo|sfv|md5|csv|log|rc|out';
+$config['extensions']['text'] = '\\.(?:txt|nfo|sfv|md5|csv|log|rc|out|ini|conf|cfg|json|xml|html?|css|js|sh|py|pl|php|md)$';
+
+// Mkdir permissions
+$config['mkdperm'] = 0755;
+
+// Debug and unicode fix
 $config['debug'] = false;
-
-// slower workaround using rTask to support unicode emoji characters.
-// temporary till it gets fixed in rtorrent upstreams
-// issue: https://github.com/rakshasa/rtorrent/pull/1309
-// set to false for utf8 with no emoji chars support
-$config['unicode_emoji_fix'] = true;
-
-$config['mkdperm'] = 755; // default permission to set to new created directories
-
-// files that are viewable as text
-$config['textExtensions'] = 'log|txt|nfo|sfv|xml|html';
-
-// see what 7zip extraction supports as type by file extension
-$config['fileExtractExtensions'] = '(7z|bzip2|t?bz2|tgz|gz(ip)?|iso|img|lzma|rar|tar|t?xz|zip|z01|wim)(\.[0-9]+)?';
-
-// see what 7zip i supports for hashers
-$config['checksumExtensions'] = [
-    "CRC32" => 'sfv',
-    "SHA256" => 'sha256sum'
-];
-
-// if the task log is bigger than the allowed memory task plugin will break ruTorrent
-// limit for listing large archives
-$config['archive']['list_limit'] = 1000;
-
-// archive creation, see archiver man page before editing
-// archive.fileExt -> config
-$config['archive']['type'] = [
-    '7z' => [
-        'bin' => '7zip',
-        'compression' => [1, 5, 9],
-    ],
-    'rar' => [
-        'bin' => 'rar',
-        'compression' => [0, 3, 5],
-       // 'wrapper' => \Flm\Rar::class
-    ]];
-
-$config['archive']['type']['zip'] = $config['archive']['type']['7z'];
-$config['archive']['type']['tar'] = $config['archive']['type']['7z'];
-$config['archive']['type']['tar']['has_password'] = false;
-$config['archive']['type']['bz2'] = $config['archive']['type']['tar'];
-$config['archive']['type']['gz'] = $config['archive']['type']['tar'];
-$config['archive']['type']['tar.7z'] = $config['archive']['type']['tar'];
-$config['archive']['type']['tar.bz2'] = $config['archive']['type']['tar'];
-$config['archive']['type']['tar.gz'] = $config['archive']['type']['tar'];
-$config['archive']['type']['tar.xz'] = $config['archive']['type']['tar'];
-
-
-// multiple passes for archiving and compression
-$config['archive']['type']['tar.gz']['multipass'] = ['tar', 'gzip'];
-$config['archive']['type']['tar.bz2']['multipass'] = ['tar', 'bzip2'];
-$config['archive']['type']['tar.7z']['multipass'] = ['tar', '7z'];
-$config['archive']['type']['tar.xz']['multipass'] = ['tar', 'xz'];
-
-
-$config['extensions'] = [
-    'checksum' => $config['checksumExtensions'],
-    // make checksum files available to the text viewer
-    'text' => $config['textExtensions'] . '|' . implode("|", $config['checksumExtensions']),
-    'fileExtract' => $config['fileExtractExtensions']
-];
+$config['unicode_emoji_fix'] = false;
+?>

@@ -108,9 +108,27 @@ class FileManager
 
     public function currentDir($relative_path = null)
     {
-        return ($relative_path == null)
-            ? $this->workdir
-            : FileUtil::fullpath(trim($relative_path, '/'), $this->workdir);
+        $debug = !empty($this->settings['debug']);
+        
+        if ($relative_path == null) {
+            return $this->workdir;
+        }
+        
+        // If relative_path is just '/', return workdir (don't append)
+        if (trim($relative_path, '/') === '') {
+            return $this->workdir;
+        }
+
+        $relative_path = (string)$relative_path;
+
+        // If the path is already an absolute filesystem path under workdir, keep it.
+        // This prevents double-prepending workdir when calling getFsPath(currentDir(...)).
+        if (strpos($relative_path, $this->workdir) === 0) {
+            return $relative_path;
+        }
+
+        // Treat jail-style paths like "/downloads/..." as relative to workdir.
+        return FileUtil::fullpath(ltrim($relative_path, '/'), $this->workdir);
     }
 
     public function getFsPath($relative = null)
@@ -158,16 +176,18 @@ class FileManager
             throw new Exception($archive_file, 6);
         }
 
-        $path = $options->path ?? null;
+        $opts = is_object($options) ? get_object_vars($options) : (array)$options;
+
+        $path = $opts['path'] ?? null;
         $archive_file = $this->getFsPath($archive_file);
-        $in_background = $options['background'] ?? false;
+        $in_background = !empty($opts['background']);
         $conf = Helper::getConfig('archive');
 
         if($in_background)
         {
             $conf['list_limit'] = 0;
         }
-        $cmd = Archive::from($archive_file, $options, $conf)
+        $cmd = Archive::from($archive_file, (object)$opts, $conf)
             ->list($path);
 
         if($in_background) {
@@ -180,7 +200,97 @@ class FileManager
 
             $listing = $task;
         } else {
-            $listing = $cmd->runRemote()[1];
+            $res = $cmd->run();
+            $exitCode = $res[0];
+            $lines = $res[1];
+
+            // If 7z fails, don't pretend the archive is empty.
+            if ($exitCode !== 0) {
+                $msg = is_array($lines) ? trim(implode("\n", $lines)) : (string)$lines;
+                throw new Exception($msg !== '' ? $msg : 'Archive listing failed', 300);
+            }
+
+            $files = [];
+            $directories = [];
+            $currentPath = null;
+            $isFolder = false;
+            $inTableSection = false;
+
+            foreach ((array)$lines as $line) {
+                $line = rtrim((string)$line, "\r\n");
+
+                // Format -slt: "Path = filename"
+                if (preg_match('/^Path = (.*)$/', $line, $m)) {
+                    if (is_string($currentPath) && $currentPath !== '' && $currentPath !== '.') {
+                        if ($isFolder) {
+                            $directories[] = $currentPath;
+                        } else {
+                            $files[] = $currentPath;
+                        }
+                    }
+                    $currentPath = $m[1];
+                    $isFolder = false;
+                    continue;
+                }
+
+                // Format -slt: "Folder = +"
+                if (is_string($currentPath) && preg_match('/^Folder = ([+-])$/', $line, $m)) {
+                    $isFolder = ($m[1] === '+');
+                    continue;
+                }
+
+                // Table format: detect separator line
+                if (preg_match('/^-+\s+-+\s+-+/', $line)) {
+                    $inTableSection = !$inTableSection;
+                    continue;
+                }
+
+                // Table format: parse file lines (YYYY-MM-DD HH:MM:SS ....)
+                if ($inTableSection && preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/', $line)) {
+                    // Parse: Date Time Attr Size Compressed Name (with flexible spacing and any attr characters)
+                    if (preg_match('/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\S{5})\s+(\d+)\s+(\d+)\s+(.+)$/', $line, $m)) {
+                        $filename = trim($m[6]);
+                        $attr = $m[3];
+                        
+                        if (!empty($filename) && $filename !== '.' && $filename !== '..') {
+                            $fileInfo = [
+                                'name' => $filename,
+                                'date' => $m[1],
+                                'time' => $m[2],
+                                'attr' => $attr,
+                                'size' => (int)$m[4],
+                                'compressed' => (int)$m[5]
+                            ];
+                            
+                            // Check if it's a directory (attribute starts with 'D')
+                            if (strpos($attr, 'D') === 0) {
+                                $directories[] = $fileInfo;
+                            } else {
+                                $files[] = $fileInfo;
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            // Handle last entry from -slt format
+            // Skip if we already have table format data (indicated by structured array entries)
+            if (is_string($currentPath) && $currentPath !== '' && $currentPath !== '.' && count($files) === 0) {
+                if ($isFolder) {
+                    $directories[] = $currentPath;
+                } else {
+                    $files[] = $currentPath;
+                }
+            }
+
+            // Stable, structured response for UI.
+            $listing = [
+                'files' => array_values($files),
+                'directories' => array_values($directories),
+                'format' => '7z-table',
+                'raw_output' => implode("\n", $lines)  // Add raw output for display
+            ];
         }
 
         //$contents = Filesystem::parseFileListing($listing[1], Archive::LIST_FORMAT);
@@ -225,9 +335,10 @@ class FileManager
 
         usort($directory_contents, [$this, 'dir_sort']);
 
-        foreach ($directory_contents as $key => $value) {
-            unset($directory_contents[$key]['type']);
-        }
+        // Don't remove 'type' - frontend needs it to distinguish files from directories
+        // foreach ($directory_contents as $key => $value) {
+        //     unset($directory_contents[$key]['type']);
+        // }
 
         return $directory_contents;
     }
@@ -306,20 +417,24 @@ class FileManager
      * @return mixed|string|string[]|null
      * @throws Exception
      */
-    public function nfo_get($file, $dos = TRUE)
+    public function nfo_get($file)
     {
         $fullpath = $this->getFsPath($file);
 
         if (!is_file($fullpath)) {
             throw new Exception($file, 6);
-        } elseif (!preg_match('/' . $this->settings['extensions']['text'] . '/', Helper::getExt($fullpath))
-            || (filesize($fullpath) > 50000)) {
+        }
+        
+        $filesize = filesize($fullpath);
+        
+        // Allow all files up to 100MB (ACE Editor will handle text/binary safely with UTF-8 sanitization)
+        if ($filesize > 104857600) {
             throw new Exception($file, 18);
         }
 
         $nfo = new NfoView($fullpath);
 
-        return $nfo->get($dos);
+        return $nfo->get();
     }
 
     /**

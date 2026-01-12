@@ -115,6 +115,28 @@ import {FileManagerActions} from "./actions.js";
                     self.currentPath = self.utils.buildPath([dir]);
                     self.triggerEvent('changeDir', [self.currentPath]);
                     self.ui.filenav.setTableEntries(response.listing);
+
+                    // Some platforms (notably 32-bit PHP) can overflow directory size calculations
+                    // or encode large numeric values in exponent form. If dirSize is missing/invalid,
+                    // fall back to summing sizes from the listing on the client.
+                    let dirSize = response.dirSize;
+                    const dirSizeNum = Number(dirSize);
+                    if (dirSize == null || !Number.isFinite(dirSizeNum) || dirSizeNum < 0) {
+                        dirSize = 0;
+                        if (Array.isArray(response.listing)) {
+                            for (const item of response.listing) {
+                                const size = item && item.size;
+                                if (size !== '' && size != null) {
+                                    const n = Number(size);
+                                    if (Number.isFinite(n) && n >= 0) {
+                                        dirSize += n;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    self.ui.filenav.setDirSize(dirSize);
                     return response;
                 }).fail((code, msg) => {
                     self.utils.logError(1, msg);
